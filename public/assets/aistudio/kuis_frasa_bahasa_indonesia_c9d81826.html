@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="id" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuis Makna Frasa Adjektival dan Verbal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        term: { light: '#1d4ed8', dark: '#93c5fd' }, // Biru tua/muda
+                        core: { light: '#dc2626', dark: '#f87171' }, // Merah
+                        example: { light: '#16a34a', dark: '#4ade80' } // Hijau
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Styles & Typography Rules */
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Pewarnaan Konsep (Teks Penting) */
+        .txt-term { color: #1d4ed8; font-weight: 600; }
+        .dark .txt-term { color: #93c5fd; }
+        .txt-core { color: #dc2626; font-weight: 600; }
+        .dark .txt-core { color: #f87171; }
+        .txt-example { color: #16a34a; font-style: italic; font-weight: 500;}
+        .dark .txt-example { color: #4ade80; }
+
+        /* Drag and Drop Helpers */
+        .draggable { cursor: grab; user-select: none; }
+        .draggable:active { cursor: grabbing; }
+        .drag-selected { box-shadow: 0 0 0 4px #3b82f6; transform: scale(1.05); transition: all 0.2s; z-index: 10; }
+        .drop-zone { min-height: 80px; transition: background-color 0.2s; }
+        .drop-zone.drag-over { background-color: rgba(59, 130, 246, 0.1); border-color: #3b82f6; }
+        
+        /* Animasi Garis Batas Putus-putus (Dashed) Berdenyut & Melingkar saat Drag */
+        @keyframes dashMarch {
+            from {
+                stroke-dashoffset: 0;
+            }
+            to {
+                stroke-dashoffset: -32;
+            }
+        }
+
+        @keyframes pulseBorderDashed {
+            0%, 100% {
+                border-color: rgba(59, 130, 246, 0.5);
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.2);
+                transform: scale(1);
+            }
+            50% {
+                border-color: rgba(59, 130, 246, 1);
+                box-shadow: 0 0 16px 2px rgba(59, 130, 246, 0.35);
+                transform: scale(1.015);
+            }
+        }
+
+        .category-box {
+            position: relative;
+            transition: all 0.25s ease;
+        }
+
+        /* Saat kartu ditarik/dipilih, kotak kategori memiliki garis batas putus-putus yang berdenyut & melingkar */
+        .is-dragging .category-box {
+            border-style: dashed !important;
+            border-color: rgba(59, 130, 246, 0.7) !important;
+            animation: pulseBorderDashed 1.3s ease-in-out infinite;
+        }
+
+        .category-box .dashed-svg-border {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            border-radius: 0.75rem;
+        }
+
+        .is-dragging .category-box .dashed-svg-border {
+            opacity: 1;
+        }
+
+        .is-dragging .category-box .dashed-svg-border rect {
+            animation: dashMarch 1s linear infinite;
+            stroke: #3b82f6;
+            stroke-width: 2.5;
+            stroke-dasharray: 10 6;
+        }
+
+        /* Sorotan saat kursor kartu berada tepat di atas kotak */
+        .is-dragging .category-box.drag-over {
+            border-color: #10b981 !important;
+            background-color: rgba(16, 185, 129, 0.08) !important;
+            transform: scale(1.025);
+            box-shadow: 0 0 20px 4px rgba(16, 185, 129, 0.35);
+        }
+
+        .is-dragging .category-box.drag-over .dashed-svg-border rect {
+            stroke: #10b981;
+            stroke-width: 3.5;
+            animation-duration: 0.5s;
+        }
+
+        /* Canvas Confetti */
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Animasi Efek Salah */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .shake { animation: shake 0.3s ease-in-out; }
+
+        /* Tantangan Mode */
+        .challenge-mode .box-label { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen pb-10">
+
+    <!-- Header & Theme Toggle -->
+    <header class="p-4 flex justify-between items-center max-w-4xl mx-auto">
+        <h1 class="font-bold text-xl md:text-2xl text-slate-700 dark:text-slate-200 cursor-pointer" onclick="restartGame()">
+            Kuis <span class="txt-term">Frasa</span>
+        </h1>
+        <div class="flex items-center gap-2">
+            <button id="btn-home" onclick="restartGame()" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition flex items-center gap-1.5 text-xs font-semibold" title="Menu Utama">
+                <span>🏠</span>
+                <span class="hidden sm:inline">Menu Utama</span>
+            </button>
+            <button id="themeToggle" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition">
+                <span id="themeIcon">🌙</span>
+            </button>
+        </div>
+    </header>
+
+    <main id="app" class="max-w-4xl mx-auto p-4 w-full">
+        <!-- SCREEN 0: WELCOME -->
+        <div id="screen-welcome" class="fade-in bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-3xl shadow-xl p-8 md:p-12 text-center">
+            <h2 class="text-4xl md:text-5xl font-extrabold mb-4 drop-shadow-md">Kuis Frasa 🚀</h2>
+            <p class="text-lg md:text-xl mb-8 font-medium text-blue-50 max-w-2xl mx-auto">
+                Pahami makna frasa adjektival dan verbal. Kata dengan kelompok adverbia yang sama memiliki makna yang sama walaupun intinya berbeda!
+            </p>
+            <button onclick="startRound1()" class="bg-white text-blue-600 hover:bg-slate-100 font-bold py-3 px-10 rounded-full shadow-lg transition transform hover:scale-105 text-lg md:text-xl">
+                Mulai Belajar
+            </button>
+        </div>
+
+        <!-- SCREEN 1: ROUND 1 (DRAG & DROP ADVERBIA) -->
+        <div id="screen-round1" class="hidden fade-in">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold">Ronde 1: Kelompokkan Adverbia</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Seret kartu (atau ketuk kartu lalu ketuk kotak) ke kelompok makna yang tepat.</p>
+                </div>
+                <div class="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-lg shadow-sm border dark:border-slate-700">
+                    <input type="checkbox" id="challengeMode" class="w-5 h-5 cursor-pointer" onchange="toggleChallengeMode()">
+                    <label for="challengeMode" class="font-semibold cursor-pointer text-sm">Mode Tantangan (Sembunyikan Label)</label>
+                </div>
+            </div>
+
+            <!-- Pool Kartu Adverbia -->
+            <div id="r1-pool" class="min-h-[60px] bg-slate-200 dark:bg-slate-700 rounded-xl p-4 flex flex-wrap gap-3 mb-6 shadow-inner drop-zone">
+                <!-- Diisi via JS -->
+            </div>
+
+            <!-- Kotak Kategori -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div class="category-box bg-white dark:bg-slate-800 rounded-xl p-4 shadow border-2 border-slate-200 dark:border-slate-700">
+                    <svg class="dashed-svg-border" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="calc(100% - 4px)" height="calc(100% - 4px)" rx="10" ry="10" fill="none" />
+                    </svg>
+                    <h3 class="font-bold text-center mb-2 box-label border-b pb-2">Negasi</h3>
+                    <div id="box-negasi" class="drop-zone flex flex-wrap gap-2 content-start" data-category="negasi">
+                        <!-- Hint: 'tidak' starts here -->
+                        <div class="bg-slate-800 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-semibold cursor-not-allowed">tidak</div>
+                    </div>
+                </div>
+                <div class="category-box bg-white dark:bg-slate-800 rounded-xl p-4 shadow border-2 border-slate-200 dark:border-slate-700">
+                    <svg class="dashed-svg-border" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="calc(100% - 4px)" height="calc(100% - 4px)" rx="10" ry="10" fill="none" />
+                    </svg>
+                    <h3 class="font-bold text-center mb-2 box-label border-b pb-2">Waktu / Keaspekan</h3>
+                    <div id="box-waktu" class="drop-zone flex flex-wrap gap-2 content-start" data-category="waktu"></div>
+                </div>
+                <div class="category-box bg-white dark:bg-slate-800 rounded-xl p-4 shadow border-2 border-slate-200 dark:border-slate-700">
+                    <svg class="dashed-svg-border" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="calc(100% - 4px)" height="calc(100% - 4px)" rx="10" ry="10" fill="none" />
+                    </svg>
+                    <h3 class="font-bold text-center mb-2 box-label border-b pb-2">Modalitas</h3>
+                    <div id="box-modalitas" class="drop-zone flex flex-wrap gap-2 content-start" data-category="modalitas"></div>
+                </div>
+                <div class="category-box bg-white dark:bg-slate-800 rounded-xl p-4 shadow border-2 border-slate-200 dark:border-slate-700">
+                    <svg class="dashed-svg-border" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="calc(100% - 4px)" height="calc(100% - 4px)" rx="10" ry="10" fill="none" />
+                    </svg>
+                    <h3 class="font-bold text-center mb-2 box-label border-b pb-2 text-sm">Kualitas (Hanya Adjektiva)</h3>
+                    <div id="box-kualitas" class="drop-zone flex flex-wrap gap-2 content-start" data-category="kualitas"></div>
+                </div>
+                <div class="category-box bg-white dark:bg-slate-800 rounded-xl p-4 shadow border-2 border-slate-200 dark:border-slate-700">
+                    <svg class="dashed-svg-border" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="calc(100% - 4px)" height="calc(100% - 4px)" rx="10" ry="10" fill="none" />
+                    </svg>
+                    <h3 class="font-bold text-center mb-2 box-label border-b pb-2 text-sm">Perbandingan (Hanya Adjektiva)</h3>
+                    <div id="box-perbandingan" class="drop-zone flex flex-wrap gap-2 content-start" data-category="perbandingan"></div>
+                </div>
+                <div class="category-box bg-white dark:bg-slate-800 rounded-xl p-4 shadow border-2 border-slate-200 dark:border-slate-700">
+                    <svg class="dashed-svg-border" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="calc(100% - 4px)" height="calc(100% - 4px)" rx="10" ry="10" fill="none" />
+                    </svg>
+                    <h3 class="font-bold text-center mb-2 box-label border-b pb-2">Frekuentatif</h3>
+                    <div id="box-frekuentatif" class="drop-zone flex flex-wrap gap-2 content-start" data-category="frekuentatif"></div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between mt-6 pt-2">
+                <button onclick="restartGame()" class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition flex items-center gap-1 font-medium">
+                    🏠 Menu Utama
+                </button>
+                <button id="btn-next-r2" onclick="startRound2()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl shadow transition transform hover:scale-105 text-sm">
+                    Lanjut Ronde 2 ➡️
+                </button>
+            </div>
+        </div>
+
+        <!-- SCREEN 2: ROUND 2 (MULTIPLE CHOICE & SORTING PHRASES) -->
+        <div id="screen-round2" class="hidden fade-in min-h-[calc(100vh-140px)] flex flex-col justify-between">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b dark:border-slate-800">
+                <div class="flex items-center gap-2">
+                    <span class="rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-xs font-bold">Ronde 2</span>
+                    <h2 class="text-base sm:text-lg font-bold">Frasa Semakna</h2>
+                </div>
+                <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    Soal: <span id="r2-counter" class="font-bold text-slate-900 dark:text-white">1</span>/<span id="r2-total">10</span>
+                </div>
+            </div>
+
+            <div id="r2-question-container" class="my-auto py-2">
+                <!-- Diisi via JS -->
+            </div>
+
+            <div class="pt-2 border-t dark:border-slate-800 flex justify-between items-center text-xs text-slate-400">
+                <button onclick="restartGame()" class="hover:text-slate-700 dark:hover:text-slate-200 transition flex items-center gap-1">
+                    🏠 Menu Utama
+                </button>
+                <span>Pilih satu jawaban yang tepat</span>
+            </div>
+        </div>
+
+        <!-- SCREEN 3: RESULTS -->
+        <div id="screen-result" class="hidden fade-in bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 md:p-10 text-center">
+            <h2 class="text-3xl font-bold mb-2">Kuis Selesai! 🎉</h2>
+            <p class="text-lg mb-6">Skor kamu: <span id="final-score" class="font-bold text-4xl text-blue-600 dark:text-blue-400 block mt-2"></span></p>
+            
+            <div id="wrong-answers-container" class="text-left mb-8 hidden">
+                <h3 class="font-bold text-xl text-red-600 dark:text-red-400 mb-4 border-b pb-2">Soal yang Perlu Diingat:</h3>
+                <div id="wrong-answers-list" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    <!-- Diisi via JS -->
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-2.5 justify-center mt-4">
+                <button id="btn-retry-wrong" onclick="retryWrong()" class="hidden bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2.5 px-5 rounded-xl shadow-xs transition text-sm">
+                    🔄 Ulangi Soal yang Salah
+                </button>
+                <button onclick="startRound1()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-5 rounded-xl shadow-xs transition text-sm">
+                    🔄 Ulangi dari Ronde 1
+                </button>
+                <button onclick="restartGame()" class="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 font-semibold py-2.5 px-5 rounded-xl shadow-xs transition text-sm">
+                    🏠 Menu Utama
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- CUSTOM MODAL MESSAGE BOX (Pengganti Alert) -->
+    <div id="custom-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full transform scale-95 transition-transform" id="modal-content-box">
+            <div id="modal-icon" class="text-4xl mb-4 text-center">ℹ️</div>
+            <h3 id="modal-title" class="text-xl font-bold mb-2 text-center">Judul</h3>
+            <p id="modal-message" class="text-slate-600 dark:text-slate-300 text-center mb-6 text-sm">Pesan</p>
+            <button onclick="closeModal()" id="modal-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition">
+                Tutup
+            </button>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        /* =========================================================================
+           DATA KUIS (GURU DAPAT MENGUBAH / MENAMBAH SOAL DI SINI)
+           ========================================================================= */
+
+        // DATA RONDE 1: ADVERBIA & KELOMPOKNYA
+        const DATA_ADVERBIA = [
+            { word: "akan", cat: "waktu" }, { word: "sedang", cat: "waktu" }, 
+            { word: "sudah", cat: "waktu" }, { word: "belum", cat: "waktu" },
+            { word: "ingin", cat: "modalitas" }, { word: "harus", cat: "modalitas" }, 
+            { word: "perlu", cat: "modalitas" }, { word: "enggan", cat: "modalitas" },
+            { word: "sangat", cat: "kualitas" }, { word: "amat", cat: "kualitas" }, 
+            { word: "sekali", cat: "kualitas" }, { word: "terlalu", cat: "kualitas" },
+            { word: "lebih", cat: "perbandingan" }, { word: "kurang", cat: "perbandingan" }, 
+            { word: "paling", cat: "perbandingan" },
+            { word: "sering", cat: "frekuentatif" }, { word: "jarang", cat: "frekuentatif" }
+            // "tidak" (negasi) sudah statis di HTML
+        ];
+
+        /* DATA RONDE 2: FRASA ADJEKTIVAL & VERBAL
+           Fokus 1 tipe soal:
+           - "semakna" : Mencari frasa yang adverbianya sekelompok tapi beda kata inti.
+        */
+        const DATA_SOAL_RONDE_2 = [
+            {
+                type: "semakna",
+                soal: "akan makan", // Kategori: waktu, inti: verba
+                jawaban: "sudah pintar", // Kategori: waktu, inti: adjektiva (berbeda)
+                pengecoh: ["tidak makan", "harus makan", "lebih rajin"],
+                penjelasan: "<span class='txt-example'>Akan</span> dan <span class='txt-example'>sudah</span> sama-sama menunjukkan kelompok makna <span class='txt-core'>Waktu/Keaspekan</span>. Walaupun intinya berbeda (makan & pintar), mereka semakna."
+            },
+            {
+                type: "semakna",
+                soal: "sangat cantik", // Kategori: kualitas
+                jawaban: "mahal sekali", // Kategori: kualitas
+                pengecoh: ["sangat pandai", "kurang cantik", "sering menangis"], 
+                penjelasan: "<span class='txt-example'>Sangat</span> dan <span class='txt-example'>sekali</span> sama-sama menunjukkan kelompok makna <span class='txt-core'>Kualitas</span>."
+            },
+            {
+                type: "semakna",
+                soal: "harus bekerja", // Kategori: modalitas
+                jawaban: "ingin kaya", // Kategori: modalitas
+                pengecoh: ["sedang bekerja", "tidak bekerja", "paling kaya"],
+                penjelasan: "<span class='txt-example'>Harus</span> dan <span class='txt-example'>ingin</span> sama-sama menunjukkan kelompok makna <span class='txt-core'>Modalitas</span>."
+            },
+            {
+                type: "semakna",
+                soal: "paling kuat", // Kategori: perbandingan
+                jawaban: "kurang tinggi", // Kategori: perbandingan
+                pengecoh: ["paling lambat", "sangat kuat", "jarang tinggi"],
+                penjelasan: "<span class='txt-example'>Paling</span> dan <span class='txt-example'>kurang</span> sama-sama menunjukkan makna <span class='txt-core'>Perbandingan</span> pada adjektiva."
+            },
+            {
+                type: "semakna",
+                soal: "jarang mandi", // Kategori: frekuentatif
+                jawaban: "sering lupa", // Kategori: frekuentatif
+                pengecoh: ["tidak mandi", "belum mandi", "harus lupa"],
+                penjelasan: "<span class='txt-example'>Jarang</span> dan <span class='txt-example'>sering</span> sama-sama bermakna <span class='txt-core'>Frekuentatif</span> (kekerapan)."
+            },
+            {
+                type: "semakna",
+                soal: "sedang tidur", 
+                jawaban: "belum datang", 
+                pengecoh: ["sering tidur", "harus datang", "sangat pulas"],
+                penjelasan: "<span class='txt-example'>Sedang</span> dan <span class='txt-example'>belum</span> sama-sama bermakna <span class='txt-core'>Waktu/Keaspekan</span>."
+            },
+            {
+                type: "semakna",
+                soal: "perlu istirahat", 
+                jawaban: "enggan pergi", 
+                pengecoh: ["sudah istirahat", "kurang pergi", "selalu istirahat"],
+                penjelasan: "<span class='txt-example'>Perlu</span> dan <span class='txt-example'>enggan</span> sama-sama bermakna <span class='txt-core'>Modalitas</span>."
+            },
+            {
+                type: "semakna",
+                soal: "amat mahal", 
+                jawaban: "terlalu cepat", 
+                pengecoh: ["harus cepat", "lebih mahal", "sedang mahal"],
+                penjelasan: "<span class='txt-example'>Amat</span> dan <span class='txt-example'>terlalu</span> sama-sama bermakna <span class='txt-core'>Kualitas</span>."
+            },
+            {
+                type: "semakna",
+                soal: "lebih rajin", 
+                jawaban: "paling malas", 
+                pengecoh: ["sangat rajin", "sudah malas", "sering rajin"],
+                penjelasan: "<span class='txt-example'>Lebih</span> dan <span class='txt-example'>paling</span> sama-sama bermakna <span class='txt-core'>Perbandingan</span>."
+            },
+            {
+                type: "semakna",
+                soal: "belum sarapan", 
+                jawaban: "akan mandi", 
+                pengecoh: ["tidak sarapan", "ingin mandi", "sering sarapan"],
+                penjelasan: "<span class='txt-example'>Belum</span> dan <span class='txt-example'>akan</span> sama-sama bermakna <span class='txt-core'>Waktu/Keaspekan</span>."
+            }
+        ];
+
+        /* =========================================================================
+           STATE & VARIABEL GLOBAL
+           ========================================================================= */
+        let currentQuestions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let wrongQuestions = []; // Menyimpan soal yang salah untuk diulang
+        let isRetrying = false;
+        
+        let draggedItem = null;
+        let selectedItem = null; // Untuk mode ketuk (mobile)
+
+        /* =========================================================================
+           UTILITIES
+           ========================================================================= */
+        // Dark Mode Toggle
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const html = document.documentElement;
+        
+        // Cek preferensi sistem
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            html.classList.add('dark');
+            html.classList.remove('light');
+            document.getElementById('themeIcon').innerText = '☀️';
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            html.classList.toggle('light');
+            document.getElementById('themeIcon').innerText = html.classList.contains('dark') ? '☀️' : '🌙';
+        });
+
+        // Pengacak Array (Fisher-Yates)
+        function shuffleArray(array) {
+            let curId = array.length;
+            while (0 !== curId) {
+                let randId = Math.floor(Math.random() * curId);
+                curId -= 1;
+                let tmp = array[curId];
+                array[curId] = array[randId];
+                array[randId] = tmp;
+            }
+            return array;
+        }
+
+        // Tampilkan Modal Pesan
+        function showModal(title, message, icon = 'ℹ️', callback = null) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerHTML = message;
+            document.getElementById('modal-icon').innerText = icon;
+            document.getElementById('custom-modal').classList.remove('hidden');
+            
+            // Animasi pop
+            const box = document.getElementById('modal-content-box');
+            setTimeout(() => { box.classList.remove('scale-95'); box.classList.add('scale-100'); }, 10);
+
+            // Handler tombol tutup
+            const btn = document.getElementById('modal-btn');
+            btn.onclick = () => {
+                closeModal();
+                if (callback) callback();
+            };
+        }
+
+        function closeModal() {
+            const box = document.getElementById('modal-content-box');
+            box.classList.remove('scale-100');
+            box.classList.add('scale-95');
+            setTimeout(() => { document.getElementById('custom-modal').classList.add('hidden'); }, 150);
+        }
+
+        /* =========================================================================
+           DRAG AND DROP LOGIC (Mouse & Touch/Ketuk)
+           ========================================================================= */
+        function initDragAndDrop(itemSelector, zoneSelector) {
+            const items = document.querySelectorAll(itemSelector);
+            const zones = document.querySelectorAll(zoneSelector);
+            const r1Screen = document.getElementById('screen-round1');
+
+            const clearDragStates = () => {
+                if (r1Screen) r1Screen.classList.remove('is-dragging');
+                document.querySelectorAll('.category-box').forEach(b => b.classList.remove('drag-over'));
+                document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('drag-over'));
+            };
+
+            items.forEach(item => {
+                // Drag untuk Desktop
+                item.addEventListener('dragstart', (e) => {
+                    if (item.draggable === false) return; // Abaikan jika sudah benar
+                    draggedItem = item;
+                    if (r1Screen) r1Screen.classList.add('is-dragging');
+                    setTimeout(() => item.style.opacity = '0.5', 0);
+                });
+                item.addEventListener('dragend', () => {
+                    clearDragStates();
+                    setTimeout(() => {
+                        if (draggedItem) draggedItem.style.opacity = '1';
+                        draggedItem = null;
+                    }, 0);
+                });
+
+                // Klik/Tap untuk Mobile & Desktop (Klik item lalu klik zona)
+                item.addEventListener('click', (e) => {
+                    if (item.draggable === false) return; // Abaikan jika sudah benar
+                    e.stopPropagation();
+                    // Jika mengklik item yang sudah terpilih, batalkan
+                    if (selectedItem === item) {
+                        item.classList.remove('drag-selected');
+                        selectedItem = null;
+                        clearDragStates();
+                    } else {
+                        // Batalkan yang sebelumnya
+                        if (selectedItem) selectedItem.classList.remove('drag-selected');
+                        selectedItem = item;
+                        item.classList.add('drag-selected');
+                        if (r1Screen) r1Screen.classList.add('is-dragging');
+                    }
+                });
+            });
+
+            zones.forEach(zone => {
+                const catBox = zone.closest('.category-box');
+
+                // Event Drag Desktop
+                zone.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    zone.classList.add('drag-over');
+                    if (catBox) catBox.classList.add('drag-over');
+                });
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('drag-over');
+                    if (catBox) catBox.classList.remove('drag-over');
+                });
+                zone.addEventListener('drop', e => {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+                    if (catBox) catBox.classList.remove('drag-over');
+                    clearDragStates();
+                    if (draggedItem) {
+                        handleItemPlacement(draggedItem, zone);
+                        // Hapus state select jika di-drop via drag
+                        if(selectedItem) {
+                             selectedItem.classList.remove('drag-selected');
+                             selectedItem = null;
+                        }
+                    }
+                });
+
+                // Event Klik Zona (untuk menerima item yang di-tap)
+                zone.addEventListener('click', () => {
+                    if (selectedItem) {
+                        handleItemPlacement(selectedItem, zone);
+                        selectedItem.classList.remove('drag-selected');
+                        selectedItem = null;
+                        clearDragStates();
+                    }
+                });
+            });
+        }
+
+        // Fungsi Validasi Saat Item Masuk ke Kotak
+        function handleItemPlacement(item, zone) {
+            const zoneCat = zone.dataset.category;
+            if (!zoneCat) return; // Abaikan jika dikembalikan ke pool (meskipun tidak mungkin via zona)
+
+            if (item.dataset.cat === zoneCat) {
+                // Jawaban Benar
+                zone.appendChild(item);
+                item.classList.replace('bg-blue-600', 'bg-green-500');
+                item.classList.replace('hover:bg-blue-500', 'hover:bg-green-400');
+                item.draggable = false; // Kunci item
+                item.style.cursor = 'default';
+                
+                // Cek apakah semuanya sudah selesai
+                const pool = document.getElementById('r1-pool');
+                if (pool.children.length === 0) {
+                    document.getElementById('btn-next-r2').classList.remove('hidden');
+                }
+            } else {
+                // Jawaban Salah
+                item.classList.replace('bg-blue-600', 'bg-red-500');
+                item.classList.add('shake');
+                
+                setTimeout(() => {
+                    item.classList.replace('bg-red-500', 'bg-blue-600');
+                    item.classList.remove('shake');
+                }, 400);
+            }
+        }
+
+
+        /* =========================================================================
+           RONDE 1: KELOMPOKKAN ADVERBIA
+           ========================================================================= */
+        function startRound1() {
+            document.getElementById('screen-welcome').classList.add('hidden');
+            document.getElementById('screen-round1').classList.remove('hidden');
+            
+            const pool = document.getElementById('r1-pool');
+            pool.innerHTML = '';
+            
+            // Kosongkan zona (kecuali kotak negasi yang punya 'tidak')
+            document.querySelectorAll('.drop-zone').forEach(z => {
+                if(z.id !== 'box-negasi' && z.id !== 'r1-pool') z.innerHTML = '';
+            });
+
+            let shuffledWords = shuffleArray([...DATA_ADVERBIA]);
+            
+            shuffledWords.forEach(data => {
+                const div = document.createElement('div');
+                div.className = 'draggable bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg shadow cursor-pointer font-medium transition-colors';
+                div.draggable = true;
+                div.textContent = data.word;
+                div.dataset.cat = data.cat;
+                pool.appendChild(div);
+            });
+
+            initDragAndDrop('.draggable', '.drop-zone');
+            // Tombol Lanjut Ronde 2 selalu aktif
+        }
+
+        function toggleChallengeMode() {
+            const isChallenging = document.getElementById('challengeMode').checked;
+            const container = document.getElementById('screen-round1');
+            if (isChallenging) {
+                container.classList.add('challenge-mode');
+            } else {
+                container.classList.remove('challenge-mode');
+            }
+        }
+
+        function checkRound1() {
+            const pool = document.getElementById('r1-pool');
+            if (pool.children.length > 0) {
+                showModal('Belum Selesai', 'Pindahkan semua kata ke dalam kotak kelompok maknanya terlebih dahulu.', '⚠️');
+                return;
+            }
+
+            let allCorrect = true;
+            let wrongItems = [];
+
+            // Cek setiap kotak
+            const zones = document.querySelectorAll('#screen-round1 .drop-zone');
+            zones.forEach(zone => {
+                const zoneCat = zone.dataset.category;
+                if (!zoneCat) return; // Skip pool
+                
+                Array.from(zone.children).forEach(item => {
+                    // Skip static 'tidak'
+                    if (item.classList.contains('cursor-not-allowed')) return;
+
+                    if (item.dataset.cat === zoneCat) {
+                        item.classList.replace('bg-blue-600', 'bg-green-600');
+                        item.classList.replace('hover:bg-blue-500', 'hover:bg-green-500');
+                    } else {
+                        allCorrect = false;
+                        wrongItems.push(item);
+                        item.classList.replace('bg-blue-600', 'bg-red-500');
+                        item.classList.replace('hover:bg-blue-500', 'hover:bg-red-400');
+                    }
+                });
+            });
+
+            if (allCorrect) {
+                showModal('Hebat!', 'Semua adverbia sudah berada di kelompok yang benar. Mari lanjut ke Ronde 2!', '🌟', () => {
+                    startRound2();
+                });
+            } else {
+                showModal('Ada yang Salah', 'Beberapa kata ditandai merah karena berada di kotak yang salah. Kata-kata tersebut akan dikembalikan.', '❌', () => {
+                    // Kembalikan yang salah ke pool dan ubah warna ke awal
+                    wrongItems.forEach(item => {
+                        item.classList.replace('bg-red-500', 'bg-blue-600');
+                        item.classList.replace('hover:bg-red-400', 'hover:bg-blue-500');
+                        pool.appendChild(item);
+                    });
+                });
+            }
+        }
+
+        /* =========================================================================
+           RONDE 2: FRASA ADJEKTIVAL & VERBAL
+           ========================================================================= */
+        function startRound2() {
+            document.getElementById('screen-round1').classList.add('hidden');
+            document.getElementById('screen-round2').classList.remove('hidden');
+            
+            if (!isRetrying) {
+                currentQuestions = shuffleArray([...DATA_SOAL_RONDE_2]);
+                currentQuestionIndex = 0;
+                score = 0;
+                wrongQuestions = [];
+            }
+            
+            document.getElementById('r2-total').innerText = currentQuestions.length;
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const container = document.getElementById('r2-question-container');
+            container.innerHTML = '';
+            document.getElementById('r2-counter').innerText = currentQuestionIndex + 1;
+
+            const q = currentQuestions[currentQuestionIndex];
+
+            // Hanya tipe semakna - tampilan terpusat pas layar tanpa scroll
+            container.innerHTML = `
+                <div class="text-center mb-2">
+                    <p class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">Pilih frasa yang <span class="txt-core font-bold">SEMAKNA</span> dengan:</p>
+                    <div class="text-2xl sm:text-3xl font-extrabold text-center text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-slate-800 py-3 sm:py-4 px-4 rounded-xl shadow-xs my-2.5 max-w-lg mx-auto border border-blue-100 dark:border-slate-700">
+                        "${q.soal}"
+                    </div>
+                </div>
+                <div id="choices" class="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-w-lg mx-auto"></div>
+            `;
+            
+            let choices = [...q.pengecoh, q.jawaban];
+            choices = shuffleArray(choices);
+            
+            const choicesContainer = document.getElementById('choices');
+            choices.forEach(choice => {
+                const btn = document.createElement('button');
+                btn.className = 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-slate-700/60 text-sm sm:text-base font-medium p-3 sm:p-3.5 rounded-xl transition text-left flex items-center justify-between shadow-2xs';
+                btn.innerText = choice;
+                btn.onclick = () => handleAnswer(choice === q.jawaban, btn, q);
+                choicesContainer.appendChild(btn);
+            });
+        }
+
+        function handleAnswer(isCorrect, btnElement, questionData) {
+            // Disable all buttons
+            const btns = document.querySelectorAll('#choices button');
+            btns.forEach(b => b.disabled = true);
+
+            if (isCorrect) {
+                btnElement.classList.replace('border-slate-200', 'border-green-500');
+                btnElement.classList.replace('bg-white', 'bg-green-50');
+                btnElement.classList.add('dark:border-green-400', 'dark:bg-green-900');
+                score++;
+            } else {
+                btnElement.classList.replace('border-slate-200', 'border-red-500');
+                btnElement.classList.replace('bg-white', 'bg-red-50');
+                btnElement.classList.add('dark:border-red-400', 'dark:bg-red-900');
+                
+                // Highlight correct
+                btns.forEach(b => {
+                    if (b.innerText === questionData.jawaban) {
+                        b.classList.replace('border-slate-200', 'border-green-500');
+                        b.classList.add('dark:border-green-400');
+                    }
+                });
+                
+                if(!wrongQuestions.includes(questionData)) {
+                    wrongQuestions.push(questionData);
+                }
+            }
+
+            setTimeout(() => { showExplanation(questionData, isCorrect); }, 500);
+        }
+
+        function showExplanation(q, isCorrect) {
+            const title = isCorrect ? '✅ Tepat Sekali!' : '❌ Kurang Tepat';
+            const icon = isCorrect ? '🎉' : '💡';
+            
+            showModal(title, q.penjelasan, icon, () => {
+                currentQuestionIndex++;
+                if (currentQuestionIndex < currentQuestions.length) {
+                    renderQuestion();
+                } else {
+                    showResult();
+                }
+            });
+        }
+
+        /* =========================================================================
+           RONDE 3: HASIL & EFEK CONFETTI (HTML5 CANVAS VANILLA JS)
+           ========================================================================= */
+        let confettiAnimId = null;
+        let confettiParticles = [];
+        let confettiCanvas = null;
+
+        function startConfetti() {
+            stopConfetti(); // Hentikan confetti lama jika ada
+
+            confettiCanvas = document.getElementById('confetti-canvas');
+            if (!confettiCanvas) {
+                confettiCanvas = document.createElement('canvas');
+                confettiCanvas.id = 'confetti-canvas';
+                document.body.appendChild(confettiCanvas);
+            }
+            confettiCanvas.style.display = 'block';
+
+            const ctx = confettiCanvas.getContext('2d');
+            let w = (confettiCanvas.width = window.innerWidth);
+            let h = (confettiCanvas.height = window.innerHeight);
+
+            const resizeHandler = () => {
+                if (!confettiCanvas) return;
+                w = confettiCanvas.width = window.innerWidth;
+                h = confettiCanvas.height = window.innerHeight;
+            };
+            window.addEventListener('resize', resizeHandler);
+
+            const colors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
+                '#8b5cf6', '#ec4899', '#06b6d4', '#eab308', '#6366f1'
+            ];
+
+            confettiParticles = [];
+            const count = 130;
+
+            for (let i = 0; i < count; i++) {
+                confettiParticles.push({
+                    x: Math.random() * w,
+                    y: Math.random() * -h * 0.8, // Mulai dari atas luar layar
+                    w: Math.random() * 8 + 6,
+                    h: Math.random() * 5 + 4,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: Math.random() * 2.8 + 2.2,
+                    rotation: Math.random() * 360,
+                    rotationSpeed: (Math.random() - 0.5) * 6,
+                    oscillationSpeed: Math.random() * 0.04 + 0.02,
+                    oscillationOffset: Math.random() * Math.PI * 2,
+                    type: Math.random() > 0.35 ? 'rect' : 'circle',
+                    opacity: 1
+                });
+            }
+
+            const startTime = Date.now();
+
+            function frame() {
+                ctx.clearRect(0, 0, w, h);
+                const now = Date.now();
+                const elapsedSec = (now - startTime) / 1000;
+
+                confettiParticles.forEach(p => {
+                    p.y += p.vy;
+                    p.x += Math.sin(now * p.oscillationSpeed * 0.05 + p.oscillationOffset) * 1.4 + p.vx * 0.3;
+                    p.rotation += p.rotationSpeed;
+
+                    // Efek berputar 3D (skala horizontal dinamis)
+                    const scaleX = Math.cos((p.rotation * Math.PI) / 180);
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rotation * Math.PI) / 360);
+                    ctx.scale(scaleX, 1);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.opacity;
+
+                    if (p.type === 'circle') {
+                        ctx.beginPath();
+                        ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                    }
+                    ctx.restore();
+
+                    // Respawn di atas selama 7 detik pertama
+                    if (p.y > h + 20) {
+                        if (elapsedSec < 7) {
+                            p.y = -15 - Math.random() * 30;
+                            p.x = Math.random() * w;
+                            p.vy = Math.random() * 2.8 + 2.2;
+                        } else {
+                            p.opacity = Math.max(0, p.opacity - 0.03);
+                        }
+                    }
+                });
+
+                const anyVisible = confettiParticles.some(p => p.opacity > 0.02 && p.y <= h + 20);
+                if (anyVisible) {
+                    confettiAnimId = requestAnimationFrame(frame);
+                } else {
+                    stopConfetti();
+                }
+            }
+
+            confettiAnimId = requestAnimationFrame(frame);
+        }
+
+        function stopConfetti() {
+            if (confettiAnimId) {
+                cancelAnimationFrame(confettiAnimId);
+                confettiAnimId = null;
+            }
+            if (confettiCanvas) {
+                const ctx = confettiCanvas.getContext('2d');
+                ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+                confettiCanvas.style.display = 'none';
+            }
+        }
+
+        function showResult() {
+            document.getElementById('screen-round2').classList.add('hidden');
+            const resScreen = document.getElementById('screen-result');
+            resScreen.classList.remove('hidden');
+
+            const total = currentQuestions.length;
+            const percentage = Math.round((score / total) * 100);
+            document.getElementById('final-score').innerText = `${score} / ${total} (${percentage}%)`;
+
+            // Efek confetti jika nilai di atas 80%
+            if (percentage > 80) {
+                startConfetti();
+            } else {
+                stopConfetti();
+            }
+
+            const wrongContainer = document.getElementById('wrong-answers-container');
+            const wrongList = document.getElementById('wrong-answers-list');
+            const retryBtn = document.getElementById('btn-retry-wrong');
+
+            if (wrongQuestions.length > 0) {
+                wrongContainer.classList.remove('hidden');
+                retryBtn.classList.remove('hidden');
+                wrongList.innerHTML = '';
+                
+                wrongQuestions.forEach((wq, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'bg-red-50 dark:bg-slate-700 p-4 rounded-xl border border-red-100 dark:border-slate-600';
+                    let qText = `Frasa semakna dengan "${wq.soal}"`;
+                    
+                    div.innerHTML = `
+                        <p class="font-bold text-sm mb-1">${i+1}. ${qText}</p>
+                        <p class="text-sm">${wq.penjelasan}</p>
+                    `;
+                    wrongList.appendChild(div);
+                });
+            } else {
+                wrongContainer.classList.add('hidden');
+                retryBtn.classList.add('hidden');
+            }
+        }
+
+        function retryWrong() {
+            stopConfetti();
+            isRetrying = true;
+            currentQuestions = [...wrongQuestions]; // Hanya ulangi yang salah
+            currentQuestionIndex = 0;
+            score = 0;
+            wrongQuestions = []; // Reset wrong list untuk percobaan ini
+            
+            document.getElementById('screen-result').classList.add('hidden');
+            startRound2();
+        }
+
+        function restartGame() {
+            stopConfetti();
+            isRetrying = false;
+            document.getElementById('screen-result').classList.add('hidden');
+            document.getElementById('screen-welcome').classList.remove('hidden');
+            
+            // Uncheck challenge mode toggle
+            document.getElementById('challengeMode').checked = false;
+            toggleChallengeMode();
+        }
+
+    </script>
+</body>
+</html>

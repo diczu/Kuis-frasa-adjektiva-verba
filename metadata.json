@@ -1,0 +1,6 @@
+{
+  "name": "Kuis Frasa Bahasa Indonesia",
+  "description": "Kuis interaktif makna frasa adjektival dan verbal bahasa Indonesia dengan pengelompokan adverbia drag-and-drop dan evaluasi semakna.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
